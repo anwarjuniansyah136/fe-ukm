@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Trash2,
   KeyRound,
   GraduationCap,
   Award,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  ExternalLink,
+  BookOpen
 } from 'lucide-react';
-import { shortDateLabel, initials, memberStatusInfo, Empty } from '../shared.jsx';
+import { shortDateLabel, initials, memberStatusInfo, safeUrl, Empty } from '../shared.jsx';
 
 export default function PeoplePage({
   people,
@@ -23,10 +25,30 @@ export default function PeoplePage({
   roleFilter,
   setRoleFilter,
   filteredPeople,
-  isPengurus
+  isPengurus,
+  api
 }) {
   const [resetModalUser, setResetModalUser] = useState(null);
   const [newPassword, setNewPassword] = useState('Pasim12345678!');
+  const [auditionsByMember, setAuditionsByMember] = useState({});
+
+  useEffect(() => {
+    if (!api || (!isAdmin && !isPengurus)) return;
+    let active = true;
+    api('/tahfidz/auditions')
+      .then((list) => {
+        if (!active || !Array.isArray(list)) return;
+        const map = {};
+        for (const item of list) {
+          if (!map[item.memberId]) map[item.memberId] = item;
+        }
+        setAuditionsByMember(map);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [api, isAdmin, isPengurus, pendingRegistrations.length]);
 
   async function handleResetPasswordSubmit(e) {
     e.preventDefault();
@@ -66,54 +88,152 @@ export default function PeoplePage({
             <span className="badge badge-warning">{pendingRegistrations.length} Perlu Verifikasi</span>
           </div>
           <p className="text-body">
-            Sesuai kebijakan UKM PASIM Mengaji, calon pendaftar memilih ingin mendaftar sebagai Anggota atau
-            Pengurus. Penetapan hak akses diputuskan oleh pihak berwenang (Admin untuk calon Pengurus, Admin &
-            Pengurus untuk calon Anggota).
+            Saat pendaftaran awal, pendaftar belum memiliki role (Belum Ditetapkan). Jika mendaftar jalur Tahfidz,
+            pendaftar wajib menyelesaikan tes bacaan 1–3 ayat random terlebih dahulu. Admin atau Pengurus memverifikasi
+            rekaman bacaan dan menetapkan role saat menyetujui pendaftaran.
           </p>
 
           <div style={{ marginTop: 15 }}>
             {pendingRegistrations.map((p) => {
               const isPengurusReq = p.requestedRole === 'PENGURUS';
+              const isTahfidzReq = p.requestedProgram === 'TAHFIDZ';
+              const audition = auditionsByMember[p.id];
               const canApprove = isAdmin || !isPengurusReq;
 
               return (
-                <article className="full-task-row" key={p.id}>
-                  <div className="person-cell">
+                <article className="full-task-row" key={p.id} style={{ flexWrap: 'wrap', gap: 12 }}>
+                  <div className="person-cell" style={{ flex: '1 1 280px' }}>
                     <div className="avatar">{initials(p.name)}</div>
                     <div className="person-info">
                       <b>{p.name}</b>
                       <small>{p.email}</small>
-                      <span>
-                        Mendaftar sebagai:{' '}
-                        <b style={{ color: isPengurusReq ? '#5f329e' : '#2b633d' }}>
-                          {isPengurusReq ? 'Calon Pengurus' : 'Calon Anggota'}
-                        </b>{' '}
-                        · {shortDateLabel(p.createdAt)}
+                      <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 3 }}>
+                        <span className="badge badge-neutral" style={{ fontSize: 10 }}>
+                          Role: {p.role || 'Belum Ditetapkan'}
+                        </span>
+                        <span
+                          className={`badge ${isPengurusReq ? 'badge-info' : isTahfidzReq ? 'badge-success' : 'badge-warning'}`}
+                          style={{ fontSize: 10 }}
+                        >
+                          Jalur:{' '}
+                          {isPengurusReq
+                            ? 'Calon Pengurus UKM'
+                            : isTahfidzReq
+                            ? 'Program Tahfidz (Tes 1–3 Ayat)'
+                            : 'Program Tahlil'}
+                        </span>
+                        <span>· {shortDateLabel(p.createdAt)}</span>
                       </span>
+
+                      {isTahfidzReq && audition && (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            padding: '8px 10px',
+                            borderRadius: 8,
+                            background: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            fontSize: 11,
+                            color: '#14532d',
+                            display: 'grid',
+                            gap: 4
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <BookOpen size={13} />
+                            <strong>
+                              Tes Bacaan Random: QS. {audition.randomSurah} ({audition.randomAyatStart}–{audition.randomAyatEnd})
+                            </strong>
+                            {safeUrl(audition.recordingUrl) && (
+                              <a
+                                href={safeUrl(audition.recordingUrl)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="button outline btn-sm"
+                                style={{ padding: '2px 8px', fontSize: 10 }}
+                              >
+                                <ExternalLink size={11} /> Cek Rekaman Bacaan
+                              </a>
+                            )}
+                          </div>
+                          {audition.memberNote && (
+                            <div style={{ color: '#374151' }}>Catatan pendaftar: {audition.memberNote}</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     {canApprove ? (
                       <>
-                        <button
-                          disabled={busy}
-                          className="button success"
-                          onClick={() =>
-                            handleAction(
-                              `/admin/registrations/${p.id}`,
-                              'PATCH',
-                              { status: 'APPROVED' },
-                              `Pendaftaran ${p.name} disetujui sebagai ${p.requestedRole}.`
-                            )
-                          }
-                        >
-                          Setujui ({p.requestedRole})
-                        </button>
-                        {isAdmin && isPengurusReq && (
+                        {isPengurusReq ? (
+                          <>
+                            <button
+                              disabled={busy}
+                              className="button success btn-sm"
+                              onClick={() =>
+                                handleAction(
+                                  `/admin/registrations/${p.id}`,
+                                  'PATCH',
+                                  { status: 'APPROVED', role: 'PENGURUS' },
+                                  `Pendaftaran ${p.name} disetujui dan ditetapkan sebagai Pengurus.`
+                                )
+                              }
+                            >
+                              Setujui sbg Pengurus
+                            </button>
+                            <button
+                              disabled={busy}
+                              className="button outline btn-sm"
+                              onClick={() =>
+                                handleAction(
+                                  `/admin/registrations/${p.id}`,
+                                  'PATCH',
+                                  { status: 'APPROVED', role: 'ANGGOTA' },
+                                  `Pendaftaran ${p.name} disetujui sebagai Anggota.`
+                                )
+                              }
+                            >
+                              Setujui sbg Anggota
+                            </button>
+                          </>
+                        ) : isTahfidzReq ? (
+                          <>
+                            <button
+                              disabled={busy}
+                              className="button success btn-sm"
+                              onClick={() =>
+                                handleAction(
+                                  `/admin/registrations/${p.id}`,
+                                  'PATCH',
+                                  { status: 'APPROVED', role: 'ANGGOTA', tahfidzDecision: 'APPROVED_TAHFIDZ' },
+                                  `Pendaftaran ${p.name} disetujui sebagai Anggota (Lulus Tes Tahfidz → Pilih Target Hafalan).`
+                                )
+                              }
+                            >
+                              Setujui Tahfidz (Anggota)
+                            </button>
+                            <button
+                              disabled={busy}
+                              className="button outline btn-sm"
+                              onClick={() =>
+                                handleAction(
+                                  `/admin/registrations/${p.id}`,
+                                  'PATCH',
+                                  { status: 'APPROVED', role: 'ANGGOTA', tahfidzDecision: 'DIRECT_TO_TAHLIL' },
+                                  `Pendaftaran ${p.name} disetujui sebagai Anggota dan diarahkan ke Program Tahlil terlebih dahulu.`
+                                )
+                              }
+                              title="Jika bacaan belum memenuhi syarat Tahfidz, setujui ke Tahlil dulu"
+                            >
+                              Arahkan ke Tahlil (Anggota)
+                            </button>
+                          </>
+                        ) : (
                           <button
                             disabled={busy}
-                            className="button outline"
+                            className="button success btn-sm"
                             onClick={() =>
                               handleAction(
                                 `/admin/registrations/${p.id}`,
@@ -122,14 +242,32 @@ export default function PeoplePage({
                                 `Pendaftaran ${p.name} disetujui sebagai Anggota.`
                               )
                             }
-                            title="Setujui sebagai Anggota biasa alih-alih Pengurus"
                           >
                             Setujui sbg Anggota
                           </button>
                         )}
+
+                        {isAdmin && !isPengurusReq && (
+                          <button
+                            disabled={busy}
+                            className="button outline btn-sm"
+                            onClick={() =>
+                              handleAction(
+                                `/admin/registrations/${p.id}`,
+                                'PATCH',
+                                { status: 'APPROVED', role: 'PENGURUS' },
+                                `Pendaftaran ${p.name} disetujui dan ditetapkan sebagai Pengurus.`
+                              )
+                            }
+                            title="Tetapkan akun ini sebagai Pengurus UKM"
+                          >
+                            Setujui sbg Pengurus
+                          </button>
+                        )}
+
                         <button
                           disabled={busy}
-                          className="button outline danger"
+                          className="button outline danger btn-sm"
                           onClick={() =>
                             handleAction(
                               `/admin/registrations/${p.id}`,

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { shortDateLabel, activityStatusInfo } from '../shared.jsx';
 
-export default function LandingPage({ setPage, activities = [] }) {
+export default function LandingPage({ setPage, activities = [], onOpenBgPicker }) {
   const upcomingActivities = activities.slice(0, 3);
 
   return (
@@ -44,6 +44,16 @@ export default function LandingPage({ setPage, activities = [] }) {
         </nav>
 
         <div className="landing-actions">
+          {onOpenBgPicker && (
+            <button
+              type="button"
+              className="bg-picker-pill"
+              onClick={onOpenBgPicker}
+              title="Pilih Wallpaper Latar Belakang Web"
+            >
+              <ImageIcon size={14} /> Ganti Background
+            </button>
+          )}
           <button onClick={() => setPage('Masuk')} className="btn-landing-login">
             <LogIn size={15} /> Masuk
           </button>

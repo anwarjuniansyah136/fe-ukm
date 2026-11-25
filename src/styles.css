@@ -6,6 +6,8 @@
   font-synthesis:none;
   text-rendering:optimizeLegibility;
   font-smooth:always;
+  --app-bg-image:url('/images/bg-grand-mosque.jpg');
+  --app-bg-tint:0.82;
   --green:#184b3e;
   --deep:#123c33;
   --muted:#83908a;
@@ -20,31 +22,38 @@
 }
 *{box-sizing:border-box}
 
-/* Enhanced Royal Islamic Canvas Background */
+/* Grand Islamic Canvas Background with Dynamic Wallpaper */
 body{
   margin:0;
   min-width:320px;
-  background-color:#f6f9f6;
+  min-height:100vh;
+  background-color:#08241d;
   background-image:
-    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 45%),
-    radial-gradient(at 100% 0%, rgba(217, 119, 6, 0.06) 0px, transparent 40%),
-    radial-gradient(at 100% 100%, rgba(5, 150, 105, 0.08) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 45%),
-    url("data:image/svg+xml,%3Csvg width='72' height='72' viewBox='0 0 72 72' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23059669' stroke-width='0.75' stroke-opacity='0.055'%3E%3Crect x='18' y='18' width='36' height='36' /%3E%3Crect x='18' y='18' width='36' height='36' transform='rotate(45 36 36)' /%3E%3Ccircle cx='36' cy='36' r='12' /%3E%3Ccircle cx='36' cy='36' r='3.5' fill='%23059669' fill-opacity='0.04' /%3E%3Cpath d='M0 0l72 72M72 0L0 72M36 0v72M0 36h72' stroke-opacity='0.03'/%3E%3C/g%3E%3C/svg%3E");
+    linear-gradient(135deg, rgba(246, 250, 247, var(--app-bg-tint, 0.82)) 0%, rgba(234, 247, 238, var(--app-bg-tint, 0.85)) 100%),
+    var(--app-bg-image, url('/images/bg-grand-mosque.jpg'));
+  background-size:cover;
+  background-position:center top;
   background-attachment:fixed;
+  background-repeat:no-repeat;
+  transition:background-image .3s ease;
 }
 
 button,input,select,textarea{font:inherit}
 button{cursor:pointer}
-.app-shell{min-height:100vh}
+.app-shell{
+  min-height:100vh;
+  background:transparent;
+}
 
 .sidebar{
   position:fixed;
   inset:0 auto 0 0;
   width:246px;
-  background:linear-gradient(180deg, #ffffff 0%, #fafffc 60%, #f0fdf4 100%);
-  border-right:1px solid rgba(16, 185, 129, 0.15);
-  box-shadow:2px 0 20px rgba(4, 120, 87, 0.04);
+  background:linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(250,255,252,0.92) 60%, rgba(240,253,244,0.92) 100%);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-right:1px solid rgba(16, 185, 129, 0.18);
+  box-shadow:2px 0 20px rgba(4, 120, 87, 0.05);
   padding:25px 16px 18px;
   display:flex;
   flex-direction:column;
@@ -1951,9 +1960,17 @@ a.nav-link { text-decoration: none; }
    ======================================================= */
 .landing-shell {
   min-height: 100vh;
-  background: #ffffff;
+  background-color: #08241d;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, var(--app-bg-tint, 0.82)) 0%, rgba(240, 249, 244, var(--app-bg-tint, 0.86)) 100%),
+    var(--app-bg-image, url('/images/bg-grand-mosque.jpg'));
+  background-size: cover;
+  background-position: center top;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: #1e293b;
   font-family: 'DM Sans', sans-serif;
+  transition: background-image .3s ease;
 }
 .landing-nav {
   height: 70px;
@@ -1961,8 +1978,10 @@ a.nav-link { text-decoration: none; }
   align-items: center;
   justify-content: space-between;
   padding: 0 5%;
-  background: #fff;
-  border-bottom: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.15);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -2500,4 +2519,206 @@ a.nav-link { text-decoration: none; }
   .approval-badges-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* =======================================================
+   WALLPAPER PICKER MODAL & CONTROLS
+   ======================================================= */
+.bg-picker-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #164e3f;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+.bg-picker-pill:hover {
+  background: #ecfdf5;
+  border-color: #059669;
+  color: #065f46;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.12);
+}
+
+.wallpaper-modal {
+  width: min(720px, 95vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 25px 60px -15px rgba(12, 38, 28, 0.25);
+}
+
+.wallpaper-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.modal-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #059669;
+  display: grid;
+  place-items: center;
+}
+
+.icon-btn-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+}
+.icon-btn-close:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.tint-control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin: 14px 0 16px;
+  border: 1px solid #e2e8f0;
+}
+.tint-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tint-buttons {
+  display: flex;
+  gap: 6px;
+}
+.tint-btn {
+  padding: 5px 11px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tint-btn:hover {
+  border-color: #059669;
+  color: #059669;
+}
+.tint-btn.active {
+  background: #047857;
+  color: #fff;
+  border-color: #047857;
+  box-shadow: 0 2px 6px rgba(4, 120, 87, 0.25);
+}
+
+.wallpaper-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  overflow-y: auto;
+  max-height: 52vh;
+  padding: 4px 2px;
+}
+
+.wallpaper-card {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+.wallpaper-card:hover {
+  border-color: #10b981;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.14);
+}
+.wallpaper-card.selected {
+  border-color: #047857;
+  box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.25);
+}
+
+.wallpaper-thumb-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  background: #0f291e;
+  overflow: hidden;
+}
+.wallpaper-thumb-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+.wallpaper-card:hover .wallpaper-thumb-wrapper img {
+  transform: scale(1.04);
+}
+
+.wallpaper-fallback-pattern {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #34d399;
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+}
+
+.wallpaper-selected-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #047857;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.wallpaper-name-caption {
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.wallpaper-modal-footer {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
 }

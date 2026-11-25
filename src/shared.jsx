@@ -93,6 +93,9 @@ export const durationName = (days) => {
 
 export const safeUrl = (url) => {
   if (!url) return null;
+  if (typeof url === 'string' && url.startsWith('/api/uploads/')) {
+    return url;
+  }
   try {
     const u = new URL(url);
     return ['http:', 'https:'].includes(u.protocol) ? u.href : null;

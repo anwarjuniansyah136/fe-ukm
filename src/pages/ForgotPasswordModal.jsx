@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
-import { Mail, KeyRound, Lock, CheckCircle2, AlertCircle, ArrowLeft, Copy } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Field } from '../shared.jsx';
 
-export default function ForgotPasswordModal({ isOpen, onClose, onNotice, onError, api }) {
+export default function ForgotPasswordModal({ isOpen, onClose, onNotice, onError, api, initialEmail = '' }) {
   const [step, setStep] = useState(1); // 1: input email, 2: enter token & new password
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [token, setToken] = useState('');
-  const [receivedToken, setReceivedToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setStep(1);
+      setEmail(initialEmail || '');
+      setToken('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setErrorMsg('');
+    }
+  }, [isOpen, initialEmail]);
 
   if (!isOpen) return null;
 
@@ -20,16 +30,15 @@ export default function ForgotPasswordModal({ isOpen, onClose, onNotice, onError
     setLoading(true);
     setErrorMsg('');
     try {
-      const res = await api('/auth/forgot-password', {
+      await api('/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email: email.trim() })
       });
-      setReceivedToken(res.token);
-      setToken(res.token); // auto fill for convenience in testing
+      setToken('');
       setStep(2);
-      onNotice?.(`Kode token reset telah dibuat untuk ${email}. Silakan buat kata sandi baru.`);
+      onNotice?.(`Kode reset kata sandi telah dikirim ke ${email.trim()}. Silakan cek kotak masuk atau folder Spam Anda.`);
     } catch (e) {
-      setErrorMsg(e.message || 'Email tidak ditemukan.');
+      setErrorMsg(e.message || 'Gagal mengirim email reset kata sandi.');
     } finally {
       setLoading(false);
     }
@@ -112,19 +121,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onNotice, onError
           <form onSubmit={handleResetPassword} className="modal-form">
             <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 12px', borderRadius: 8, fontSize: 11, color: '#166534' }}>
               <CheckCircle2 size={15} style={{ display: 'inline', marginRight: 6, verticalAlign: -2 }} />
-              Kode token reset telah dikirim ke <strong>{email}</strong>
-              {receivedToken && (
-                <div style={{ marginTop: 6, background: '#fff', padding: '6px 10px', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px dashed #86efac' }}>
-                  <span>Kode Anda: <b style={{ letterSpacing: 2, fontSize: 13, color: '#15803d' }}>{receivedToken}</b></span>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(receivedToken)}
-                    style={{ border: 0, background: 'none', color: '#15803d', display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, cursor: 'pointer' }}
-                  >
-                    <Copy size={12} /> Salin
-                  </button>
-                </div>
-              )}
+              Kode token reset telah dikirim ke email <strong>{email}</strong>. Silakan cek <strong>Kotak Masuk</strong> atau folder <strong>Spam</strong> Anda (berlaku 30 menit).
             </div>
 
             <Field label="Kode Token Reset">

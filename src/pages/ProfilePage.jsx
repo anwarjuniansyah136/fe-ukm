@@ -22,6 +22,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { memberStatusInfo, Field, initials } from '../shared.jsx';
+import ForgotPasswordModal from './ForgotPasswordModal.jsx';
 
 const AVATAR_PRESETS = [
   { label: 'Mahasiswa 1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80' },
@@ -40,6 +41,7 @@ export default function ProfilePage({
   onNotice
 }) {
   const [activeTab, setActiveTab] = useState('data'); // 'data' | 'security' | 'kta'
+  const [emailResetOpen, setEmailResetOpen] = useState(false);
 
   // Profile fields
   const [name, setName] = useState(user?.name || '');
@@ -496,13 +498,29 @@ export default function ProfilePage({
                   )}
                 </Field>
 
-                <div className="profile-form-footer">
+                <div className="profile-form-footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center' }}>
                   <button type="submit" disabled={saving} className="button primary btn-save-large">
                     <Lock size={16} /> {saving ? 'Menyimpan Sandi Baru...' : 'Perbarui Kata Sandi Sekarang'}
+                  </button>
+                  <button
+                    type="button"
+                    className="button outline"
+                    onClick={() => setEmailResetOpen(true)}
+                  >
+                    <Mail size={15} /> Ubah Kata Sandi via Email (Kode OTP)
                   </button>
                 </div>
               </form>
             )}
+
+            <ForgotPasswordModal
+              isOpen={emailResetOpen}
+              onClose={() => setEmailResetOpen(false)}
+              onNotice={onNotice}
+              onError={onError}
+              api={api}
+              initialEmail={user?.email || ''}
+            />
 
             {/* TAB 3: KARTU TANDA ANGGOTA (KTA DIGITAL) */}
             {activeTab === 'kta' && (

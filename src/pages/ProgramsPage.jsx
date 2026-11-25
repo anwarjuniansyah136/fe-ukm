@@ -48,6 +48,41 @@ export default function ProgramsPage({
   const [tahlilVideoUrl, setTahlilVideoUrl] = useState('');
   const [tahlilImageUrl, setTahlilImageUrl] = useState('');
   const [tahlilNote, setTahlilNote] = useState('');
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  async function uploadTahlilMedia(file, kind) {
+    if (!file) return;
+    if (kind === 'video') setUploadingVideo(true);
+    else setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('kind', kind);
+      const token = sessionStorage.getItem('pasim-token') || '';
+      const res = await fetch('/api/uploads', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.message || `Gagal mengunggah ${kind === 'video' ? 'video' : 'gambar'}`);
+      }
+      if (kind === 'video') {
+        setTahlilVideoUrl(data.url);
+        onNotice?.(`Video "${file.name}" berhasil diunggah!`);
+      } else {
+        setTahlilImageUrl(data.url);
+        onNotice?.(`Gambar "${file.name}" berhasil diunggah!`);
+      }
+    } catch (e) {
+      onError?.(e.message || 'Gagal mengunggah file media');
+    } finally {
+      if (kind === 'video') setUploadingVideo(false);
+      else setUploadingImage(false);
+    }
+  }
 
   // Tahfidz Test Modal (Req 4: 1-3 random ayat)
   const [testModalOpen, setTestModalOpen] = useState(false);
@@ -437,15 +472,25 @@ export default function ProgramsPage({
               <div className="card-actions">
                 {isAnggota && (
                   <>
-                    {/* Tahlil Actions */}
+                    {/* Tahlil Actions (Req 3: Hanya 1 program utama hingga selesai; setoran berdasarkan tugas Pengurus) */}
                     {isTahlil && (
                       <div className="program-inline-actions">
-                        <button
-                          onClick={() => setTahlilModalOpen(true)}
-                          className="button primary btn-sm"
-                        >
-                          <Send size={13} /> Setor Tahlil (Video / Gambar)
-                        </button>
+                        {memberStatus === 'AKTIF_TAHLIL' ? (
+                          <button
+                            onClick={() => setPage && setPage('Setoran Tartil')}
+                            className="button primary btn-sm"
+                          >
+                            <Send size={13} /> Buka Tugas & Setoran Tahlil
+                          </button>
+                        ) : ['MENUNGGU_TES_TAHFIDZ', 'MEMILIH_TARGET_TAHFIDZ', 'MENUNGGU_APPROVAL_DURASI', 'AKTIF_TAHFIDZ'].includes(memberStatus) ? (
+                          <div className="locked-program-notice">
+                            <ShieldAlert size={13} /> Sedang aktif di Tahfidz (hanya boleh 1 program utama hingga selesai)
+                          </div>
+                        ) : (
+                          <span className="badge badge-success">
+                            <CheckCircle2 size={12} /> Program Tahlil Selesai
+                          </span>
+                        )}
                       </div>
                     )}
 
@@ -532,26 +577,58 @@ export default function ProgramsPage({
               <div className="info-guide-box">
                 <BookOpen size={16} />
                 <span>
-                  Pengiriman proses Tahlil dapat berupa <strong>Video bacaan</strong> (tautan YouTube/Drive/Cloud) dan/atau <strong>Gambar/Foto kehadiran</strong> kegiatan.
+                  Pengiriman proses Tahlil dapat berupa <strong>Video bacaan</strong> (upload file langsung atau tautan URL) dan/atau <strong>Gambar/Foto bukti kegiatan</strong>.
                 </span>
               </div>
 
-              <Field label="Tautan / URL Video Bimbingan Tahlil (Opsional)">
-                <input
-                  type="url"
-                  value={tahlilVideoUrl}
-                  onChange={(e) => setTahlilVideoUrl(e.target.value)}
-                  placeholder="https://... (contoh: https://drive.google.com/... atau youtube)"
-                />
+              <Field label="Video Bimbingan Tahlil (Upload File atau Tautan URL — Opsional)">
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    disabled={uploadingVideo}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadTahlilMedia(f, 'video');
+                    }}
+                  />
+                  {uploadingVideo && <small style={{ color: '#15803d' }}>Mengunggah video…</small>}
+                  <input
+                    type="text"
+                    value={tahlilVideoUrl}
+                    onChange={(e) => setTahlilVideoUrl(e.target.value)}
+                    placeholder="Atau tempel tautan video: https://drive.google.com/... / YouTube"
+                  />
+                </div>
               </Field>
 
-              <Field label="Tautan / URL Gambar Bukti Bacaan (Opsional)">
-                <input
-                  type="url"
-                  value={tahlilImageUrl}
-                  onChange={(e) => setTahlilImageUrl(e.target.value)}
-                  placeholder="https://... (contoh: https://images.unsplash.com/... atau link foto)"
-                />
+              <Field label="Gambar / Foto Bukti Tahlil (Upload File atau Tautan URL — Opsional)">
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={uploadingImage}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadTahlilMedia(f, 'image');
+                    }}
+                  />
+                  {uploadingImage && <small style={{ color: '#15803d' }}>Mengunggah gambar…</small>}
+                  <input
+                    type="text"
+                    value={tahlilImageUrl}
+                    onChange={(e) => setTahlilImageUrl(e.target.value)}
+                    placeholder="Atau tempel tautan gambar: https://..."
+                  />
+                  {tahlilImageUrl && (
+                    <img
+                      src={tahlilImageUrl}
+                      alt="Pratinjau gambar tahlil"
+                      style={{ maxHeight: 140, borderRadius: 8, objectFit: 'cover', border: '1px solid #d1d5db' }}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
+                </div>
               </Field>
 
               <Field label="Catatan Tambahan untuk Pengurus">
@@ -567,8 +644,8 @@ export default function ProgramsPage({
                 <button type="button" onClick={() => setTahlilModalOpen(false)} className="button outline">
                   Batal
                 </button>
-                <button type="submit" className="button primary">
-                  Kirimkan Setoran Tahlil
+                <button type="submit" disabled={uploadingVideo || uploadingImage} className="button primary">
+                  {uploadingVideo || uploadingImage ? 'Menunggu Upload…' : 'Kirimkan Setoran Tahlil'}
                 </button>
               </div>
             </form>

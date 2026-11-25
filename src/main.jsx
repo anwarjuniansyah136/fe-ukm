@@ -12,6 +12,7 @@ import ActivitiesPage from './pages/ActivitiesPage.jsx';
 import MediaAuditPage from './pages/MediaAuditPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import ForgotPasswordModal from './pages/ForgotPasswordModal.jsx';
+import BackgroundPickerModal, { applyWallpaper, getInitialWallpaper } from './components/BackgroundPickerModal.jsx';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -39,7 +40,8 @@ import {
   Eye,
   KeyRound,
   User as UserIcon,
-  Compass
+  Compass,
+  Image as ImageIcon
 } from 'lucide-react';
 import './styles.css';
 
@@ -63,6 +65,7 @@ function App() {
   const [data, setData] = useState({
     programs: [],
     tasks: [],
+    tahlilTasks: [],
     materials: [],
     submissions: [],
     people: []
@@ -89,12 +92,51 @@ function App() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
+  // Initial registration state (Req 4: Tahfidz 1-3 random ayat test at registration, role unassigned)
+  const [regProgram, setRegProgram] = useState('TAHLIL');
+  const [regRandomAyat, setRegRandomAyat] = useState(null);
+  const [regLoadingAyat, setRegLoadingAyat] = useState(false);
+  const [regRecordingUrl, setRegRecordingUrl] = useState('');
+  const [regTestNote, setRegTestNote] = useState('');
+
+  async function loadRegRandomAyat() {
+    setRegLoadingAyat(true);
+    setError('');
+    try {
+      const res = await api('/tahfidz/test/random-ayat');
+      setRegRandomAyat(res);
+    } catch (e) {
+      setError(e.message || 'Gagal memuat ayat random untuk tes Tahfidz.');
+    } finally {
+      setRegLoadingAyat(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!token && page === 'Daftar' && regProgram === 'TAHFIDZ' && !regRandomAyat && !regLoadingAyat) {
+      loadRegRandomAyat();
+    }
+  }, [token, page, regProgram]);
+
+  // Wallpaper background state & live effect
+  const [bgState, setBgState] = useState(getInitialWallpaper);
+  const [bgModalOpen, setBgModalOpen] = useState(false);
+
+  useEffect(() => {
+    applyWallpaper(bgState.bgId, bgState.tint);
+  }, [bgState]);
+
+  const handleBgChange = (bgId, tint) => {
+    setBgState({ bgId, tint });
+    applyWallpaper(bgId, tint);
+  };
+
   const isAdmin = user?.role === 'ADMIN';
   const isPengurus = user?.role === 'PENGURUS';
   const isAnggota = user?.role === 'ANGGOTA';
   const canManage = isAdmin || isPengurus;
 
-  const { programs, tasks, materials, submissions, people } = data;
+  const { programs, tasks, tahlilTasks, materials, submissions, people } = data;
 
   function logout() {
     sessionStorage.removeItem('pasim-token');
@@ -102,7 +144,7 @@ function App() {
     localStorage.removeItem('pasim-user');
     setToken('');
     setUser(null);
-    setData({ programs: [], tasks: [], materials: [], submissions: [], people: [] });
+    setData({ programs: [], tasks: [], tahlilTasks: [], materials: [], submissions: [], people: [] });
     setModal(null);
     setPage('Beranda');
   }
@@ -143,15 +185,16 @@ function App() {
     try {
       const me = await api('/auth/me');
       setUser(me);
-      const [p, t, m, s, u, act] = await Promise.all([
+      const [p, t, tt, m, s, u, act] = await Promise.all([
         api('/programs'),
         api('/tasks'),
+        api('/tahlil-tasks').catch(() => []),
         api('/materials'),
         api('/submissions'),
         me.role === 'ANGGOTA' ? Promise.resolve([]) : api('/admin/users'),
         api('/activities').catch(() => [])
       ]);
-      setData({ programs: p, tasks: t, materials: m, submissions: s, people: u });
+      setData({ programs: p, tasks: t, tahlilTasks: tt || [], materials: m, submissions: s, people: u });
       if (act && Array.isArray(act)) setActivities(act);
     } catch (e) {
       setError(e.message);
@@ -222,11 +265,34 @@ function App() {
 
     try {
       if (page === 'Daftar') {
-        await api('/auth/register', {
+        const isPengurusReg = regProgram === 'PENGURUS';
+        const payload = {
+          name: f.name,
+          email: f.email,
+          password: f.password,
+          ...(isPengurusReg ? { requestedRole: 'PENGURUS' } : { requestedProgram: regProgram })
+        };
+        if (regProgram === 'TAHFIDZ') {
+          if (!regRandomAyat || !regRecordingUrl.trim()) {
+            setError('Pendaftaran Program Tahfidz wajib menyertakan hasil tes bacaan 1–3 ayat random beserta tautan rekaman audio/video.');
+            setBusy(false);
+            return;
+          }
+          payload.testSurah = regRandomAyat.surah;
+          payload.testAyatStart = regRandomAyat.ayatStart;
+          payload.testAyatEnd = regRandomAyat.ayatEnd;
+          payload.testRecordingUrl = regRecordingUrl.trim();
+          payload.testNote = regTestNote.trim();
+        }
+        const res = await api('/auth/register', {
           method: 'POST',
-          body: JSON.stringify(f)
+          body: JSON.stringify(payload)
         });
-        setNotice('Pendaftaran berhasil! Akun Anda sedang menunggu persetujuan Admin/Pengurus.');
+        setRegProgram('TAHLIL');
+        setRegRandomAyat(null);
+        setRegRecordingUrl('');
+        setRegTestNote('');
+        setNotice(res?.message || 'Pendaftaran berhasil! Role akan ditetapkan saat akun disetujui Admin/Pengurus.');
         setPage('Masuk');
       } else {
         const res = await api('/auth/login', {
@@ -350,10 +416,20 @@ function App() {
   // Landing Page when not authenticated or on 'Beranda' route
   if (!token && page === 'Beranda') {
     return (
-      <LandingPage
-        setPage={setPage}
-        activities={activities}
-      />
+      <>
+        <LandingPage
+          setPage={setPage}
+          activities={activities}
+          onOpenBgPicker={() => setBgModalOpen(true)}
+        />
+        <BackgroundPickerModal
+          isOpen={bgModalOpen}
+          onClose={() => setBgModalOpen(false)}
+          currentBg={bgState.bgId}
+          currentTint={bgState.tint}
+          onChange={handleBgChange}
+        />
+      </>
     );
   }
 
@@ -363,11 +439,23 @@ function App() {
     return (
       <div className="auth-shell">
         <section className="auth-story">
-          <div className="brand-light" onClick={() => setPage('Beranda')} style={{ cursor: 'pointer' }}>
-            <div className="brand-mark">
-              <img src="/images/logo-pasim-mengaji.png" alt="UKM PASIM Mengaji" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 2 }}>
+            <div className="brand-light" onClick={() => setPage('Beranda')} style={{ cursor: 'pointer' }}>
+              <div className="brand-mark">
+                <img src="/images/logo-pasim-mengaji.png" alt="UKM PASIM Mengaji" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
+              <b>UKM PASIM MENGAJI</b>
             </div>
-            <b>UKM PASIM MENGAJI</b>
+            <button
+              type="button"
+              className="bg-picker-pill"
+              onClick={() => setBgModalOpen(true)}
+              style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}
+              title="Ganti Background Web"
+            >
+              <ImageIcon size={13} />
+              <span>Ganti Background</span>
+            </button>
           </div>
           <div className="story-copy">
             <span className="eyebrow">UNIVERSITAS NASIONAL PASIM</span>
@@ -395,7 +483,7 @@ function App() {
             <h2>{isRegister ? 'Formulir Pendaftaran UKM' : 'Selamat Datang'}</h2>
             <p>
               {isRegister
-                ? 'Pilih pendaftaran sebagai Anggota atau ajukan diri sebagai Pengurus UKM.'
+                ? 'Daftar akun baru dan pilih program awal. Role Anda belum ditetapkan hingga diverifikasi oleh Admin/Pengurus.'
                 : 'Masuk dengan akun terdaftar untuk mengakses program dan tugas hafalan.'}
             </p>
 
@@ -434,12 +522,105 @@ function App() {
                 autoComplete={isRegister ? 'new-password' : 'current-password'}
               />
               {isRegister && (
-                <Field label="Pilihan Jenis Pendaftaran">
-                  <select name="requestedRole" defaultValue="ANGGOTA">
-                    <option value="ANGGOTA">Anggota (Peserta Program UKM)</option>
-                    <option value="PENGURUS">Calon Pengurus (Pengelola Kegiatan)</option>
-                  </select>
-                </Field>
+                <>
+                  <Field label="Pilihan Jalur Pendaftaran">
+                    <select
+                      name="requestedProgram"
+                      value={regProgram}
+                      onChange={(e) => setRegProgram(e.target.value)}
+                    >
+                      <option value="TAHLIL">Program Tahlil (Pembinaan Dasar)</option>
+                      <option value="TAHFIDZ">Program Tahfidz Al-Qur'an (Wajib Tes Bacaan 1–3 Ayat Random)</option>
+                      <option value="PENGURUS">Calon Pengurus UKM (Pengelola Kegiatan — Perlu Persetujuan Admin)</option>
+                    </select>
+                  </Field>
+
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#475569' }}>
+                    {regProgram === 'PENGURUS' ? (
+                      <>
+                        <strong>Pendaftaran Calon Pengurus:</strong> Role belum aktif hingga diverifikasi dan disetujui oleh <strong>Administrator</strong>.
+                      </>
+                    ) : (
+                      <>
+                        <strong>Status Role:</strong> Belum ditetapkan saat pendaftaran awal. Admin/Pengurus akan menetapkan role Anda saat verifikasi.
+                      </>
+                    )}
+                  </div>
+
+                  {regProgram === 'TAHFIDZ' && (
+                    <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: 12, display: 'grid', gap: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <div>
+                          <span className="badge badge-success" style={{ fontSize: 9 }}>TES MASUK TAHFIDZ (MAKS. 3 AYAT)</span>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#14532d', marginTop: 3 }}>
+                            {regRandomAyat
+                              ? `QS. ${regRandomAyat.surah} : Ayat ${regRandomAyat.ayatStart}–${regRandomAyat.ayatEnd}`
+                              : 'Memuat ayat random…'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={regLoadingAyat}
+                          onClick={loadRegRandomAyat}
+                          className="button outline btn-sm"
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          {regLoadingAyat ? 'Mengacak…' : '🎲 Acak Ayat Lain'}
+                        </button>
+                      </div>
+
+                      {regRandomAyat && (
+                        <>
+                          <div
+                            dir="rtl"
+                            style={{
+                              background: '#ffffff',
+                              border: '1px solid #dcfce7',
+                              borderRadius: 8,
+                              padding: '12px 14px',
+                              fontSize: 18,
+                              lineHeight: 2,
+                              textAlign: 'right',
+                              color: '#14532d',
+                              fontFamily: 'serif'
+                            }}
+                          >
+                            {regRandomAyat.arabic}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#166534', fontStyle: 'italic' }}>
+                            {regRandomAyat.latin}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.5 }}>
+                            <strong>Terjemahan:</strong> {regRandomAyat.translation}
+                          </div>
+                          <div style={{ fontSize: 10.5, color: '#065f46', background: '#dcfce7', padding: '6px 8px', borderRadius: 6 }}>
+                            <strong>Instruksi:</strong> {regRandomAyat.instructions}
+                          </div>
+                        </>
+                      )}
+
+                      <Field label="Tautan Rekaman Audio / Video Bacaan (Wajib)">
+                        <input
+                          type="url"
+                          value={regRecordingUrl}
+                          onChange={(e) => setRegRecordingUrl(e.target.value)}
+                          placeholder="https://drive.google.com/... atau link video/audio"
+                          required
+                        />
+                      </Field>
+
+                      <Field label="Catatan untuk Pengurus (Opsional)">
+                        <input
+                          type="text"
+                          value={regTestNote}
+                          onChange={(e) => setRegTestNote(e.target.value)}
+                          placeholder="Contoh: Pengalaman hafalan sebelumnya, dsb."
+                          maxLength={500}
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </>
               )}
 
               {!isRegister && (
@@ -523,6 +704,14 @@ function App() {
           onError={(msg) => setError(msg)}
           api={api}
         />
+
+        <BackgroundPickerModal
+          isOpen={bgModalOpen}
+          onClose={() => setBgModalOpen(false)}
+          currentBg={bgState.bgId}
+          currentTint={bgState.tint}
+          onChange={handleBgChange}
+        />
       </div>
     );
   }
@@ -574,6 +763,7 @@ function App() {
   const pageProps = {
     programs,
     tasks,
+    tahlilTasks,
     materials,
     submissions,
     people,
@@ -768,6 +958,16 @@ function App() {
             <span onClick={() => setPage('Beranda')} style={{ cursor: 'pointer' }}>UKM PASIM MENGAJI</span> / <b>{page}</b>
           </div>
           <div className="top-actions">
+            <button
+              type="button"
+              className="bg-picker-pill"
+              onClick={() => setBgModalOpen(true)}
+              title="Ganti Background Web"
+            >
+              <ImageIcon size={14} />
+              <span>Ganti Background</span>
+            </button>
+
             <div className="date-pill">
               <Calendar size={14} />
               <span>{dateLabel(jakartaDate())} · WIB</span>
@@ -1249,6 +1449,15 @@ function App() {
           </section>
         </div>
       )}
+
+      {/* Global Background Wallpaper Picker Modal */}
+      <BackgroundPickerModal
+        isOpen={bgModalOpen}
+        onClose={() => setBgModalOpen(false)}
+        currentBg={bgState.bgId}
+        currentTint={bgState.tint}
+        onChange={handleBgChange}
+      />
     </div>
   );
 }
